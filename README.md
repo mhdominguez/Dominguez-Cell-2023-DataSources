@@ -13,7 +13,7 @@ Quaranta, R., Fell, J., Rühle, F., Rao, J., Piccini, I., Araúzo-Bravo, M.J., V
 <br><br>
 
 ## R sessionInfo()
-`<sub>R version 4.0.2 (2020-06-22)</sub><br>`
+`R version 4.0.2 (2020-06-22)<br>`
 `<sub>Platform: x86_64-pc-linux-gnu (64-bit)</sub><br>`
 `<sub>Running under: Ubuntu 20.04.5 LTS</sub><br>`
 `<sub></sub><br>`
