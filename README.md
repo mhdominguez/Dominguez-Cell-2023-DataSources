@@ -13,8 +13,7 @@ Quaranta, R., Fell, J., Rühle, F., Rao, J., Piccini, I., Araúzo-Bravo, M.J., V
 <br><br>
 
 ## R sessionInfo()
-``
-R version 4.0.2 (2020-06-22)
+`R version 4.0.2 (2020-06-22)
 Platform: x86_64-pc-linux-gnu (64-bit)
 Running under: Ubuntu 20.04.5 LTS
 
@@ -68,7 +67,7 @@ loaded via a namespace (and not attached):
 [127] fansi_1.0.3               pillar_1.8.1              lattice_0.20-45           KEGGREST_1.34.0           fastmap_1.1.0             httr_1.4.4               
 [133] survival_3.4-0            glue_1.6.2                png_0.1-7                 bit_4.0.4                 blob_1.2.3                BiocSingular_1.10.0      
 [139] memoise_2.0.1             irlba_2.3.5               future.apply_1.9.0
-``
+`
 
 <sub>R version 4.0.2 (2020-06-22)</sub><br>
 <sub>Platform: x86_64-pc-linux-gnu (64-bit)</sub><br>
