@@ -1,0 +1,278 @@
+
+ macro "Draw ROIs, Quantify, Decrement Stack..." {
+	 //get directory to put .roi files
+	// directory = getDirectory("Choose save directory for ROI files");
+	master_title = getTitle();
+	getDimensions(dim_width, dim_height, dim_channels, dim_slices, dim_frames);
+
+	rand_num = d2s( floor(random() * 1000000 ), 0 );
+	title = "Image" + rand_num;
+	rename( title );
+	use_colocalize = "[Channel 1]"; //default
+	 
+	 //start us off
+	Stack.getPosition(channel, slice, frame);
+	
+	while( slice > 0 ) {
+		selectWindow( title );
+
+		//user has to draw ROIs here
+		Dialog.createNonBlocking("Draw ROIs");
+		Dialog.addMessage("Draw your ROIs on this frame now (Ctrl-T to add each one), or do nothing to quantify entire image.  Press OK to label and quantify them.") 
+		Dialog.show();
+		
+		//start by renaming ROIs
+		roi_count = roiManager("count");
+		if ( roi_count == 0 ) {
+			run("Select All");
+			roiManager("add");
+			roi_count = roiManager("count");
+			roiManager("Select", 0);
+			roiManager("rename", "whole_image");
+			use_colocalize = "None";
+		} else {
+			Dialog.create("Enter ROI names...");
+			//roi_names = newArray(roi_count);
+			for ( cc=0; cc<roi_count; cc++ ) {
+				roiManager("Select", cc);
+				Dialog.create("Rename ROI " + d2s(cc,0) + ": " + Roi.getName() );
+				Dialog.addString("New name:","");
+				Dialog.show();
+				roiManager("rename", Dialog.getString());
+				//this_name = Dialog.getString();
+				//Roi.setName(this_name);
+			}
+		}
+		
+		Stack.getPosition(channel, slice, frame);
+		
+		//now, rename and measure
+		for ( cc=0; cc<roi_count; cc++ ) {
+			roiManager("Select", cc);
+			base_name = Roi.getName();
+		
+			for ( ch=1; ch<=dim_channels; ch++ ) { //measure three channels from 1:3
+				Stack.setChannel(ch);
+				Stack.getPosition(channel, slice, frame);
+				//print( ch + ":" + channel + " " + slice + " " + frame );
+				roiManager("rename", base_name + "_" + d2s(ch,0));
+				roiManager("Measure");
+			}
+			roiManager("rename", base_name ); //put back basename for save
+		}
+		
+		//save ROIs for possible future use
+		//roiManager("save", directory + File.separator() + "quant_roi_z" + d2s(slice,0) + ".zip" );
+
+		//Split channels and record names of each new image stack
+		channelList = newArray(0);
+		selectWindow( title );
+		if ( dim_channels > 1 ) {
+			//split channels
+			run("Split Channels");
+			for (b=1; b<=dim_channels; b++ ) {
+				channelList = Array.concat( channelList, "C" + IJ.pad(b,1) + "-" + title );
+			}
+
+			//co-localization studies pairwise per ROI
+			for ( cc=0; cc<roi_count; cc++ ) {
+				for (b=0; b<dim_channels; b++ ) {
+					selectWindow( channelList[b] );
+					roiManager("Select", cc);
+					for (bb=b+1; bb<dim_channels; bb++ ) {
+						run("Colocalization Threshold", "channel_1=["+channelList[b]+"] channel_2=["+channelList[bb]+"] use="+use_colocalize+" channel=[Red : Green]");
+					}
+				}
+			}
+
+			//now merge
+			merge_text_list = "";
+			for (b=0; b<dim_channels; b++ ) {
+				merge_text_list = merge_text_list + " c"+d2s(b+1,0)+"=[" + channelList[b] + "]";
+			}
+			run("Merge Channels...", merge_text_list + " create");
+			rename( title );
+
+		} else if ( dim_channels == 1 ) {
+			//channelList = Array.concat( channelList, title );
+		} else {
+			//continue; //skip this series altogether
+		}
+
+
+		//selectWindow("Results");
+		//saveAs("Text", "/home/martin/Documents/20-22/Mouse Early Cardiogenesis Paper/Figure 3 - Pre-cardiac MET/Cryosections/Quantify/Results.csv");
+		//run("Clear Results");
+
+
+		
+		//backpedal one frame, remove ROIs
+		slice--;
+		if ( slice >= 1 ) {
+			Stack.setPosition(channel, slice, frame);
+		}		
+		roiManager("Deselect");
+		roiManager("Delete");
+		
+	}
+	
+	rename(master_title);
+}
+/*
+ macro "Quantify Stack with Pre-drawn ROIs..." {
+	 //get directory to put .roi files
+	 directory = getDirectory("Choose load directory for ROI files");
+	 
+	//start us off
+	getDimensions(dim_width, dim_height, dim_channels, dim_slices, dim_frames);
+	Stack.setPosition(1, dim_slices, 1);
+	Stack.getPosition(channel, slice, frame);
+
+	while( slice > 1) {
+
+		Stack.getPosition(channel, slice, frame);
+		
+		//open ROIs for this slice
+		this_slice_roi_file = directory + File.separator() + "quant_roi_z" + d2s(slice,0) + ".zip";
+		if (!File.exists(this_slice_roi_file) ) {
+			Stack.setPosition(channel, slice-1, frame);
+			continue;
+		}
+		roiManager("open", this_slice_roi_file );
+		
+		//start by renaming ROIs
+		roi_count = roiManager("count");
+		if ( roi_count == 0 ) {
+			Stack.setPosition(channel, slice-1, frame);
+			continue;
+		}
+		
+		//now, rename and measure
+		for ( cc=0; cc<roi_count; cc++ ) {
+			roiManager("Select", cc);
+			base_name = Roi.getName();
+		
+			for ( ch=1; ch<4; ch++ ) { //measure three channels from 1:3
+				Stack.setChannel(ch);
+				roiManager("rename", base_name + "_" + d2s(ch,0));
+				roiManager("Measure");
+			}
+			roiManager("rename", base_name ); //put back basename for save
+		}
+		
+		//backpedal one frame, remove ROIs
+		roiManager("Deselect");
+		roiManager("Delete");
+		if ( slice >= 1 ) {
+			//slice--;
+			Stack.setPosition(channel, slice-1, frame);
+		}			
+	}
+}
+
+macro "Update Selection in ROI Manager [u]" {
+	roiManager("Update");
+}
+
+var global_open_directory = "";
+macro "Open saved ROIs in Manager [6]" {
+	if ( global_open_directory == "" ) {
+		global_open_directory = getDirectory("Choose load directory for ROI files");
+	}
+	Stack.getPosition(channel, slice, frame);
+	roiManager("open",global_open_directory + File.separator() + "quant_roi_z" + d2s(slice,0) + ".zip");
+}
+*/
+/*
+
+run("Split Channels");
+selectWindow("C4-EPIF__eCC-1_40X__S00__C3 adj.tif");
+run("Colocalize...");
+run("Coloc 2");
+selectWindow("C3-EPIF__eCC-1_40X__S00__C3 adj.tif");
+makeRectangle(1020, 324, 348, 60);
+//setTool("freehand");
+run("Coloc 2");
+selectWindow("C1-EPIF__eCC-1_40X__S00__C3 adj.tif");
+selectWindow("C2-EPIF__eCC-1_40X__S00__C3 adj.tif");
+run("Colocalization Threshold", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] use=[Channel 1] channel=[Red : Green] include");
+selectWindow("C3-EPIF__eCC-1_40X__S00__C3 adj.tif");
+run("Colocalization Threshold", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] use=[Channel 1] channel=[Red : Green] include");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 1 ] randomization=[Fay (x,y,z translation)] current_slice show_all_r_values");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 1 ] randomization=[Fay (x,y,z translation)]");
+selectWindow("C2-EPIF__eCC-1_40X__S00__C3 adj.tif");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 2] randomization=[Costes approximation (smoothed noise)] current_slice pixel=0.086 channel_2_wavelength=520 na=1.40 iterations=25 psf_radius=10");
+selectWindow("Results");
+selectWindow("Recorder");
+selectWindow("Results");
+run("Coloc 2");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 2] randomization=[Fay (x,y,z translation)] current_slice");
+run("Coloc 2");
+selectWindow("Results");
+run("Coloc 2");
+selectWindow("C3-EPIF__eCC-1_40X__S00__C3 adj.tif");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 2] randomization=[van Steensel (x translation)] current_slice");
+selectWindow("Results");
+close();
+selectWindow("C2-EPIF__eCC-1_40X__S00__C3 adj.tif");
+selectWindow("C3-EPIF__eCC-1_40X__S00__C3 adj.tif");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 1 ] randomization=[van Steensel (x translation)] current_slice");
+close();
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 1 ] randomization=[Fay (x,y,z translation)] current_slice");
+selectWindow("Results");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 1 ] randomization=[Fay (x,y,z translation)] current_slice");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 2] randomization=[Fay (x,y,z translation)] current_slice");
+run("Colocalization Test");
+run("Coloc 2", "channel_1=[C1-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi_or_mask=[ROI(s) in channel 1] threshold_regression=Bisection show_save_pdf_dialog manders'_correlation kendall's_tau_rank_correlation 2d_intensity_histogram psf=3 costes_randomisations=10");
+run("Coloc 2");
+run("Colocalize...");
+run("Coloc 2", "channel_1=[C1-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi_or_mask=[ROI(s) in channel 1] threshold_regression=Bisection display_images_in_result spearman's_rank_correlation manders'_correlation kendall's_tau_rank_correlation psf=3 costes_randomisations=10");
+run("Measure");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 2] randomization=[Fay (x,y,z translation)] current_slice");
+run("Colocalization Test", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi=[ROI in channel 1 ] randomization=[Fay (x,y,z translation)] current_slice");
+selectWindow("Results");
+run("Colocalization Threshold");
+run("Coloc 2", "channel_1=[C1-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi_or_mask=[ROI(s) in channel 1] threshold_regression=Bisection li_histogram_channel_1 li_histogram_channel_2 li_icq spearman's_rank_correlation manders'_correlation kendall's_tau_rank_correlation 2d_intensity_histogram psf=3 costes_randomisations=10");
+saveAs("Text", "/home/martin/Documents/20-22/Mouse Early Cardiogenesis Paper/Figure 3 - Pre-cardiac MET/Cryosections/Quantify/Log.txt");
+selectWindow("Log");
+Table.deleteRows(7, 7, "Log");
+Table.deleteRows(0, 37, "Log");
+run("Coloc 2", "channel_1=[C1-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi_or_mask=[ROI(s) in channel 1] threshold_regression=Bisection spearman's_rank_correlation manders'_correlation kendall's_tau_rank_correlation 2d_intensity_histogram costes'_significance_test psf=3 costes_randomisations=10");
+run("Coloc 2");
+selectWindow("C3-EPIF__eCC-1_40X__S00__C3 adj.tif");
+Table.deleteRows(0, 39, "Log");
+run("Coloc 2", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi_or_mask=[ROI(s) in channel 1] threshold_regression=Bisection spearman's_rank_correlation manders'_correlation kendall's_tau_rank_correlation 2d_intensity_histogram costes'_significance_test psf=3 costes_randomisations=10");
+run("Coloc 2", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi_or_mask=[ROI(s) in channel 2] threshold_regression=Bisection spearman's_rank_correlation manders'_correlation kendall's_tau_rank_correlation 2d_intensity_histogram costes'_significance_test psf=3 costes_randomisations=10");
+run("Coloc 2", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi_or_mask=[ROI(s) in channel 1] threshold_regression=Bisection spearman's_rank_correlation manders'_correlation kendall's_tau_rank_correlation 2d_intensity_histogram psf=3 costes_randomisations=10");
+run("Coloc 2", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] roi_or_mask=[ROI(s) in channel 2] threshold_regression=Bisection spearman's_rank_correlation manders'_correlation kendall's_tau_rank_correlation 2d_intensity_histogram psf=3 costes_randomisations=10");
+run("Color Histogram");
+run("Colocalization Threshold", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] use=[Channel 1] channel=[Red : Green] show_0");
+close();
+run("Colocalization Threshold", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] use=[Channel 1] channel=[Red : Green]");
+selectWindow("C2-EPIF__eCC-1_40X__S00__C3 adj.tif");
+run("Colocalization Threshold", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] use=[Channel 2] channel=[Red : Green]");
+run("Colocalization Threshold", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] use=[Channel 2] channel=[Red : Green] include");
+run("Colocalization Threshold", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] use=[Channel 2] channel=[Red : Green] show");
+setOption("ScaleConversions", true);
+setOption("ScaleConversions", true);
+selectWindow("Colocalized Pixel Map RGB Image");
+close();
+run("Colocalization Threshold", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] use=[Channel 2] channel=[Green : Blue]");
+saveAs("Text", "/home/martin/Documents/20-22/Mouse Early Cardiogenesis Paper/Figure 3 - Pre-cardiac MET/Cryosections/Quantify/Results.csv");
+selectWindow("Results");
+selectWindow("Results");
+selectWindow("Results");
+selectWindow("Results");
+selectWindow("Results");
+selectWindow("Results");
+selectWindow("Results");
+selectWindow("Results");
+run("Clear Results");
+run("Clear Results");
+run("Colocalization Threshold", "channel_1=[C3-EPIF__eCC-1_40X__S00__C3 adj.tif] channel_2=[C2-EPIF__eCC-1_40X__S00__C3 adj.tif] use=[Channel 2] channel=[Green : Blue]");
+selectWindow("Results");
+saveAs("Text", "/home/martin/Documents/20-22/Mouse Early Cardiogenesis Paper/Figure 3 - Pre-cardiac MET/Cryosections/Quantify/Results.csv");
+run("Clear Results");
+run("Clear Results");
+run("Measure");
+*/

@@ -1,0 +1,11 @@
+Somites,Genotype,Mef2c cells in half,Condition,Estimated Mef2c Count
+5,Mesp1-Cre/+,2405,Control,4810
+5,Mesp1-Cre/+,2007,Control,4014
+7,Isl1-Cre/Cre,1205,Isl1 KO,2410
+7,Isl1-Cre/Cre,1307,Isl1 KO,2614
+5,Isl1-Cre/Cre,1463,Isl1 KO,2926
+5,Isl1-Cre/Cre,1355,Isl1 KO,2710
+4,Isl1-Cre/+,2280,Control,4560
+4,Isl1-Cre/+,2274,Control,4548
+5,Isl1-Cre/+,2164,Control,4328
+5,Isl1-Cre/+,2460,Control,4920

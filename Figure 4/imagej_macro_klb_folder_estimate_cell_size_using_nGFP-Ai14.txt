@@ -1,0 +1,251 @@
+
+var microns_to_dilate = 4; //should be the estimated cell radius minus the nucleus radius (i.e. (Ai14 diameter - nGFP diameter) / 2 )
+var file_sep = File.separator();
+var background_threshold = 4;
+
+macro "Open t0XXXX .klb s00/s01 files to estimate total cell volume using nGFP and Ai14..." {
+	
+	directory = getDirectory("Choose input directory");
+	fileList = getFileList(directory);
+
+	//declare expandable arrays
+	process_file_list = newArray(0);
+	view_setups = newArray(0);
+	
+	//process_view_list = newArray(0);
+	Array.sort(fileList); //very critical step, can be done here or done to array processList below
+	
+	for (i=0; i<fileList.length; i++) {
+		if (startsWith(fileList[i], "t0") && endsWith(fileList[i], ".klb")) {
+
+			//now, remove .tif from end of filename
+			name_ext = split(fileList[i],".");
+			filepaddedname = "";
+			for (n=0; n<name_ext.length-1; n++) {
+				filepaddedname += name_ext[n];
+			}
+
+			//now, segment filename into TXXXX_SX and then create view setup with "SX"
+			name_ext = split(filepaddedname,"_");
+			this_view = name_ext[1];
+			
+			//see if we have seen this setup before
+			is_match = false;
+			for (m=0;m<view_setups.length; m++ ) {
+				if ( this_view == view_setups[m] ) {
+					is_match = true;
+					break;
+				}
+			}
+			if ( is_match ) {
+				//do nothing	
+			} else {
+				//add unique view setup
+				view_setups = Array.concat( view_setups, this_view );
+				
+			}
+
+			process_file_list = Array.concat( process_file_list, this_view + "///" + fileList[i] + "///" + name_ext[0] );
+		}
+	}
+	
+	Array.sort(view_setups); //sort files by their intended name, not true name
+
+	max_channels = 0;
+    max_time = 0;
+
+	//explore dataset.xml files to get unit information
+	X_voxel_micron = 0.380490284561;
+	Y_voxel_micron = 0.380490284561;
+	Z_voxel_micron = 1.52196113824;
+	voxel_units = "";
+	input_MVL_lines = newArray(100);
+	//print( "looking for... " + directory+ "dataset_klb.xml" );
+	if ( File.exists(directory+ "dataset.xml") ) { 
+		input_MVL = File.openAsString(directory+ "dataset.xml");
+		input_MVL_lines = split(input_MVL, "\n");
+		//print( "got XML");
+	} else if ( File.exists(directory+ "dataset_klb.xml") ) { 
+		input_MVL = File.openAsString(directory+ "dataset_klb.xml");
+		input_MVL_lines = split(input_MVL, "\n");
+		//print( "got XML");
+	} else if ( File.exists(directory+ "dataset_klb_s0.xml") ) { 
+		input_MVL = File.openAsString(directory+ "dataset_klb_s0.xml");
+		input_MVL_lines = split(input_MVL, "\n");
+		//print( "got XML");
+	} else if ( File.exists(directory+ "dataset_klb_s1.xml") ) { 
+		input_MVL = File.openAsString(directory+ "dataset_klb_s1.xml");
+		input_MVL_lines = split(input_MVL, "\n");
+		//print( "got XML");
+	}
+	unit_line = -1;
+	size_line = -1;
+	for ( l=0; l<input_MVL_lines.length; l++ ) {
+		if (indexOf(input_MVL_lines[l], "<size>") >= 0) {
+			size_line = l;
+		} else if (indexOf(input_MVL_lines[l], "<unit>") >= 0) {
+			unit_line = l;
+			size_line = -1;
+		}
+		if ( unit_line >= 0 && size_line >= 0 ) {
+			break;
+		}
+	}	
+	if ( unit_line >= 0 && size_line >= 0 ) {
+		//print("got lines");
+		start_index = indexOf(input_MVL_lines[size_line], "<size>");
+		subline = substring(input_MVL_lines[size_line], start_index + 6 );
+		stop_index = indexOf(subline, "</size>" );
+		size_line_data = substring(subline, 0, stop_index );
+		sizes_parsed = split( size_line_data, " " );
+		X_voxel_micron = parseFloat(sizes_parsed[0]);
+		Y_voxel_micron = parseFloat(sizes_parsed[1]);
+		Z_voxel_micron = parseFloat(sizes_parsed[2]);
+		
+		start_index = indexOf(input_MVL_lines[unit_line], "<unit>");
+		subline = substring(input_MVL_lines[unit_line], start_index + 6 );
+		stop_index = indexOf(subline, "</unit>" );
+		voxel_units = substring(subline, 0, stop_index );
+	}
+	
+	File.makeDirectory(directory + file_sep + "ProcessedCellSizeEstimate" );
+	
+	//iterate over channels, but only use channel 0 since will build filenames based on them
+	//for ( m=0; m<view_setups.length; m++ ) {
+	m=0;
+		
+		//initialize variables for processing this view setup
+		processList = newArray(0);
+		
+		for (i=0; i<process_file_list.length; i++) {
+			name_ext = split(process_file_list[i],"///");
+			if ( name_ext[0] != view_setups[m] ) {
+				continue;
+			}
+			
+			processList = Array.concat( processList, name_ext[2] );
+		}
+		call("java.lang.System.gc");
+		
+		for (i=0; i<processList.length; i++) {
+			setBatchMode(false); //KLB does not work with batch mode
+			
+			run("KLB...", "open=[" + directory + processList[i] + "_s00.klb]");
+			VirtStack = getImageID();//("window.title");
+			setBatchMode(true);
+			selectImage(VirtStack);
+			run("Duplicate...", "duplicate");
+			OrigStack = getImageID();//("window.title");
+			selectImage(VirtStack);
+			close();
+			//return;
+			//set up units
+			selectImage(OrigStack);
+			s00_title = getTitle();
+			if ( !(voxel_units == "") ) {
+				Stack.setXUnit(voxel_units);
+				run("Properties...", "pixel_width="+d2s(X_voxel_micron,8)+" pixel_height="+d2s(Y_voxel_micron,8)+" voxel_depth="+d2s(Z_voxel_micron,8) );
+			}
+			//print( "microns to dilate " + microns_to_dilate + ", voxel micron " + X_voxel_micron );
+			pixels_to_dilate = floor( 2 * microns_to_dilate / (X_voxel_micron+Y_voxel_micron) );
+			//print( "pixels to dilate: " + d2s(pixels_to_dilate,0) );
+			
+			setMinAndMax(background_threshold,background_threshold);
+			run("Apply LUT", "stack");
+			run("Make Binary", "method=Default background=Default calculate black");
+			run("Options...", "iterations="+d2s(pixels_to_dilate,0)+" count=4 pad do=Nothing");
+			run("Erode", "stack");
+
+			
+			run("KLB...", "open=[" + directory + processList[i] + "_s01.klb]");
+			VirtStack = getImageID();//("window.title");
+			setBatchMode(true);
+			selectImage(VirtStack);
+			run("Duplicate...", "duplicate");
+			OrigStack = getImageID();//("window.title");
+			setMinAndMax(0,255);
+			selectImage(VirtStack);
+			close();
+			
+			//set up units
+			selectImage(OrigStack);
+			s01_title = getTitle();
+			if ( !(voxel_units == "") ) {
+				Stack.setXUnit(voxel_units);
+				run("Properties...", "pixel_width="+d2s(X_voxel_micron,8)+" pixel_height="+d2s(Y_voxel_micron,8)+" voxel_depth="+d2s(Z_voxel_micron,8) );
+			}
+			//return;
+			imageCalculator("AND create stack", s01_title,s00_title);
+			selectWindow("Result of "+s01_title);
+			setMinAndMax(background_threshold,background_threshold);
+			run("Apply LUT", "stack");
+			
+			//delete nearly white frames
+			getDimensions(_, _, _, dim_slices, _);
+			mean_px_values = newArray(dim_slices);
+			for (ss=1; ss<=dim_slices; ss++ ) { //decrement slices to fill array with max pixel values for each slice
+				setSlice(ss);
+				getStatistics( _, mean_px_values[ss-1], _, _, _ );
+			}
+			setSlice(dim_slices);
+			for (ss=dim_slices-1; ss>=0; ss-- ) { //decrement slices to fill array with max pixel values for each slice
+				if ( mean_px_values[ss] > 240 ) {
+					run("Delete Slice");
+				} else {
+					run("Previous Slice [<]");
+				}
+			}
+			
+			//get data and close image
+			Stack.getStatistics( voxelCount, mean, min, max, std );
+			close();
+			
+			//save data
+			voxelsPositive = voxelCount * mean / 255;
+			cubicMicronsPositive = X_voxel_micron * Y_voxel_micron * Z_voxel_micron * voxelsPositive;
+			File.append( processList[i] + "\t" + d2s(voxelsPositive,0) + "\t" + d2s(cubicMicronsPositive,8) + "\t" + d2s(voxelCount,0) + "\t" + d2s(std,8),  directory + file_sep + "ProcessedCellSizeEstimate" + file_sep + "processed_data.txt" );
+	
+			//no need to actually save the stack, just need the data
+			//saveAs("Tiff", directory + file_sep + "ProcessedCellSizeEstimate" + file_sep + processList[i] + "_processed" );
+			
+	//		return;
+			if (isOpen(s00_title)) {
+				selectWindow(s00_title);
+				close();	
+			}
+			if (isOpen(s01_title)) {
+				selectWindow(s01_title);
+				close();	
+			}		
+
+			call("java.lang.System.gc");
+
+		}
+	//}
+	setBatchMode(false);
+}
+
+/*
+run("KLB...");
+run("Duplicate...", "duplicate");
+selectWindow("t00001_s00.klb");
+close();
+run("KLB...");
+run("Duplicate...", "duplicate");
+selectWindow("t00001_s01.klb");
+close();
+//run("Brightness/Contrast...");
+run("Enhance Contrast", "saturated=0.35");
+selectWindow("t00001_s00-1.klb");
+//min_max 0,0
+run("Apply LUT", "stack");
+run("Make Binary", "method=Default background=Default calculate black");
+run("Options...", "iterations=10 count=1 pad do=Nothing");
+run("Erode", "stack");
+imageCalculator("AND create stack", "t00001_s01-1.klb","t00001_s00-1.klb");
+selectWindow("Result of t00001_s01-1.klb");
+run("Histogram", "stack");
+selectWindow("Result of t00001_s01-1.klb");
+selectWindow("Histogram of Resultoft00001_s01-1");
+*/
+
