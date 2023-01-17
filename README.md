@@ -1,5 +1,5 @@
 # Dominguez-Cell-2023-DataSources
-Data and scripts for analyzing early cardiac development, to be published as "Graded mesoderm assembly governs cell fate and morphogenesis of the early mammalian heart".
+Data and scripts for analyzing early cardiac development, to be published as "Graded mesoderm assembly governs cell fate and morphogenesis of the early mammalian heart" in Cell (2023).
 <br><br>
 
 ## References to outside datasets analyzed herein
