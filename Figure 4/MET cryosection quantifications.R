@@ -129,7 +129,7 @@ t.test(EHF[which(EHF$Region=="MEF2C+ Mesoderm"),]$Rtotal,Som[which(Som$Region=="
 #==============
 # Intensity of panCad, aCat, Mef2c
 #==============
-Ch.labels <- c("1"="Mef2c","2"="ɑ-Catenin","3"="pan-\nCadherin")
+Ch.labels <- c("1"="MEF2C","2"="ɑ-CATENIN","3"="pan-\nCADHERIN")
 p2 <- resultTable_intensity %>% filter( Region=="MEF2C+ Mesoderm" ) %>% filter( Ch == 1 | Ch == 2 | Ch == 3 ) %>% #Ch2 is aCat
   ggplot( aes(x=Stage, y=Median-Min, color=Stage)) +
   #geom_violin( trim=FALSE, lwd=2 ) +
@@ -173,7 +173,7 @@ p2 <- resultTable_intensity %>% filter( Region=="MEF2C+ Mesoderm" ) %>% filter( 
     #panel.grid = element_blank(),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
-    panel.spacing = unit(8, "lines"),
+    panel.spacing = unit(3.5, "lines"),
     #panel.grid.major.y = element_line(colour="#A0A0A0",size=1),
     #strip.text = element_blank(),
     #strip.background = element_blank(),
@@ -315,7 +315,7 @@ t.test(EHF[which(EHF$Region=="MEF2C+ Mesoderm"),]$Rtotal,Som[which(Som$Region=="
 #==============
 # Intensity of nCad, gCat
 #==============
-Ch.labels <- c("1"="DAPI","2"="N-Cadherin","3"="γ-Catenin","4"="Mef2c")
+Ch.labels <- c("1"="DAPI","2"="N-CADHERIN","3"="γ-CATENIN","4"="MEF2C")
 p2 <- resultTable_intensity %>% filter( Region=="MEF2C+ Mesoderm" ) %>% filter( Ch == 2 | Ch == 3 ) %>%
   ggplot( aes(x=Stage, y=Median-Min, color=Stage)) +
   #geom_violin( trim=FALSE, lwd=2 ) +
@@ -359,7 +359,7 @@ p2 <- resultTable_intensity %>% filter( Region=="MEF2C+ Mesoderm" ) %>% filter( 
     #panel.grid = element_blank(),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
-    panel.spacing = unit(8, "lines"),
+    panel.spacing = unit(4, "lines"),
     #panel.grid.major.y = element_line(colour="#A0A0A0",size=1),
     #strip.text = element_blank(),
     #strip.background = element_blank(),
